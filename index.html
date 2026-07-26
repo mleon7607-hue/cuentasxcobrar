@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cuentas × Cobrar</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📒</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="paper-bg" aria-hidden="true"></div>
+
+<header class="app-header">
+  <div class="header-inner">
+    <div class="brand">
+      <span class="brand-mark">×</span>
+      <div>
+        <h1>Cuentas <span class="brand-mark-inline">×</span> Cobrar</h1>
+        <p class="brand-sub">Libro de préstamos y abonos</p>
+      </div>
+    </div>
+    <div class="summary-bar" id="summaryBar">
+      <div class="summary-item">
+        <span class="summary-label">Por cobrar</span>
+        <span class="summary-value" id="sumTotalPorCobrar">$0.00</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Deudores activos</span>
+        <span class="summary-value" id="sumDeudoresActivos">0</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Al día</span>
+        <span class="summary-value" id="sumAlDia">0</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="app-main">
+
+  <section class="toolbar">
+    <input type="search" id="buscador" placeholder="Buscar deudor por nombre, teléfono o nota…" autocomplete="off">
+    <select id="ordenSelect">
+      <option value="saldo-desc">Mayor deuda primero</option>
+      <option value="nombre-asc">Nombre (A–Z)</option>
+      <option value="reciente">Más reciente</option>
+    </select>
+    <button class="btn btn-primary" id="btnNuevoDeudor">+ Nuevo deudor</button>
+  </section>
+
+  <section class="lista-wrap">
+    <div id="listaDeudores" class="lista-deudores"></div>
+    <div id="estadoVacio" class="estado-vacio" hidden>
+      <p class="estado-vacio-sello">∅</p>
+      <p>Todavía no has registrado ningún deudor.</p>
+      <button class="btn btn-primary" id="btnNuevoDeudorVacio">Agregar el primero</button>
+    </div>
+  </section>
+
+</main>
+
+<footer class="app-footer">
+  <p>Los datos se guardan solo en este navegador. Exporta una copia de respaldo con frecuencia.</p>
+  <div class="footer-actions">
+    <button class="btn btn-ghost" id="btnExportarExcelTodo">Exportar todo a Excel</button>
+    <button class="btn btn-ghost" id="btnExportar">Exportar respaldo (.json)</button>
+    <label class="btn btn-ghost" for="inputImportar">Importar respaldo</label>
+    <input type="file" id="inputImportar" accept="application/json" hidden>
+  </div>
+</footer>
+
+<!-- Panel de detalle de deudor -->
+<div class="overlay" id="overlayDetalle" hidden>
+  <aside class="panel-detalle" id="panelDetalle" role="dialog" aria-modal="true" aria-labelledby="detalleNombre">
+    <button class="btn-cerrar" id="btnCerrarDetalle" aria-label="Cerrar">✕</button>
+
+    <div class="detalle-header">
+      <div class="detalle-sello" id="detalleSello">$0.00</div>
+      <h2 id="detalleNombre">—</h2>
+      <p class="detalle-meta" id="detalleMeta"></p>
+      <div class="detalle-editar" id="detalleEditar" hidden>
+        <input type="text" id="editNombre" placeholder="Nombre">
+        <input type="text" id="editTelefono" placeholder="Teléfono (opcional)">
+        <textarea id="editNotas" placeholder="Notas (opcional)" rows="2"></textarea>
+        <div class="fila-botones">
+          <button class="btn btn-primary" id="btnGuardarEdicion">Guardar</button>
+          <button class="btn btn-ghost" id="btnCancelarEdicion">Cancelar</button>
+        </div>
+      </div>
+      <div class="detalle-acciones">
+        <button class="btn btn-link" id="btnEditarDeudor">Editar datos</button>
+        <button class="btn btn-link" id="btnVerEstadoCuenta">Ver estado de cuenta detallado</button>
+        <button class="btn btn-link btn-peligro" id="btnEliminarDeudor">Eliminar deudor</button>
+      </div>
+    </div>
+
+    <div class="detalle-nuevas-acciones">
+      <button class="btn btn-deuda" id="btnRegistrarDeuda">+ Registrar préstamo</button>
+      <button class="btn btn-abono" id="btnRegistrarAbono">+ Registrar abono</button>
+    </div>
+
+    <form class="form-transaccion" id="formTransaccion" hidden>
+      <h3 id="formTransaccionTitulo">Registrar préstamo</h3>
+      <label>
+        Monto
+        <input type="number" id="txMonto" min="0.01" step="0.01" placeholder="0.00" required>
+      </label>
+      <label id="labelMetodo">
+        Forma del préstamo
+        <select id="txMetodo">
+          <option value="efectivo">Efectivo</option>
+          <option value="producto">Producto</option>
+          <option value="servicio">Servicio</option>
+        </select>
+      </label>
+      <label>
+        Concepto / descripción
+        <input type="text" id="txConcepto" placeholder="Ej: repuesto de freno, préstamo en efectivo…">
+      </label>
+      <label>
+        Fecha
+        <input type="date" id="txFecha" required>
+      </label>
+      <div class="fila-botones">
+        <button type="submit" class="btn btn-primary" id="btnGuardarTx">Guardar</button>
+        <button type="button" class="btn btn-ghost" id="btnCancelarTx">Cancelar</button>
+      </div>
+    </form>
+
+    <div class="detalle-historial">
+      <h3>Historial</h3>
+      <table class="tabla-historial">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Concepto</th>
+            <th class="col-monto">Monto</th>
+            <th class="col-monto">Saldo</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tablaHistorialBody"></tbody>
+      </table>
+      <p class="historial-vacio" id="historialVacio" hidden>Sin movimientos todavía.</p>
+    </div>
+  </aside>
+</div>
+
+<!-- Modal nuevo deudor -->
+<div class="overlay" id="overlayNuevo" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloModalNuevo">
+    <button class="btn-cerrar" id="btnCerrarNuevo" aria-label="Cerrar">✕</button>
+    <h2 id="tituloModalNuevo">Nuevo deudor</h2>
+    <form id="formNuevoDeudor">
+      <label>
+        Nombre completo
+        <input type="text" id="nuevoNombre" required placeholder="Ej: Carlos Pérez">
+      </label>
+      <label>
+        Teléfono <span class="opcional">(opcional)</span>
+        <input type="text" id="nuevoTelefono" placeholder="(305) 555-0100">
+      </label>
+      <fieldset class="deuda-inicial">
+        <legend>Deuda inicial <span class="opcional">(puede quedar en $0.00)</span></legend>
+        <label>
+          Monto
+          <input type="number" id="nuevoMonto" min="0" step="0.01" value="0" placeholder="0.00">
+        </label>
+        <label>
+          Origen del préstamo
+          <select id="nuevoMetodo">
+            <option value="efectivo">Efectivo</option>
+            <option value="producto">Producto</option>
+            <option value="servicio">Servicio</option>
+          </select>
+        </label>
+        <label>
+          Concepto / descripción
+          <input type="text" id="nuevoConcepto" placeholder="Ej: préstamo en efectivo, batería, mano de obra…">
+        </label>
+      </fieldset>
+      <label>
+        Notas <span class="opcional">(opcional)</span>
+        <textarea id="nuevoNotas" rows="2" placeholder="Cualquier detalle adicional"></textarea>
+      </label>
+      <div class="fila-botones">
+        <button type="submit" class="btn btn-primary">Guardar deudor</button>
+        <button type="button" class="btn btn-ghost" id="btnCancelarNuevo">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal estado de cuenta detallado (imprimible / exportable) -->
+<div class="overlay" id="overlayEstado" hidden>
+  <div class="modal modal-estado" id="modalEstado" role="dialog" aria-modal="true">
+    <button class="btn-cerrar no-print" id="btnCerrarEstado" aria-label="Cerrar">✕</button>
+    <div id="estadoCuentaContenido"></div>
+    <div class="fila-botones no-print">
+      <button class="btn btn-primary" id="btnImprimirEstado">Imprimir / Guardar PDF</button>
+      <button class="btn btn-ghost" id="btnExportarEstadoExcel">Exportar a Excel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal detalle de un movimiento individual -->
+<div class="overlay" id="overlayTxDetalle" hidden>
+  <div class="modal modal-tx-detalle" id="modalTxDetalle" role="dialog" aria-modal="true" aria-labelledby="txDetalleTitulo">
+    <button class="btn-cerrar" id="btnCerrarTxDetalle" aria-label="Cerrar">✕</button>
+    <h2 id="txDetalleTitulo">Detalle del movimiento</h2>
+
+    <dl class="tx-detalle-datos" id="txDetalleDatos"></dl>
+
+    <form class="form-transaccion" id="formEditarTx" hidden>
+      <label>
+        Monto
+        <input type="number" id="editTxMonto" min="0.01" step="0.01" required>
+      </label>
+      <label id="labelEditMetodo">
+        Forma del préstamo
+        <select id="editTxMetodo">
+          <option value="efectivo">Efectivo</option>
+          <option value="producto">Producto</option>
+          <option value="servicio">Servicio</option>
+        </select>
+      </label>
+      <label>
+        Concepto / descripción
+        <input type="text" id="editTxConcepto">
+      </label>
+      <label>
+        Fecha
+        <input type="date" id="editTxFecha" required>
+      </label>
+      <div class="fila-botones">
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+        <button type="button" class="btn btn-ghost" id="btnCancelarEditTx">Cancelar</button>
+      </div>
+    </form>
+
+    <div class="fila-botones" id="txDetalleAcciones">
+      <button class="btn btn-ghost" id="btnEditarTx">Editar movimiento</button>
+      <button class="btn btn-link btn-peligro" id="btnEliminarTxDetalle">Eliminar movimiento</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
