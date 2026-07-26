@@ -166,17 +166,29 @@ cuentas-x-cobrar/
 
 ## Funcionalidades
 
-- Cuenta propia con correo y contraseña; tus datos viajan contigo entre dispositivos.
-- **Sincronización automática en tiempo real** vía Firebase Firestore — funciona incluso con conexión intermitente (se pone al día apenas hay internet).
+**Cuentas × Cobrar**
 - Agregar un deudor con nombre, teléfono y notas opcionales.
 - Registrar la deuda inicial (puede quedar en $0.00) indicando si fue en **efectivo**, **producto** o **servicio**.
 - Registrar nuevos préstamos y abonos en cualquier momento.
 - Ver y **editar el detalle de cualquier movimiento** individual (fecha, monto, concepto, forma).
 - **Estado de cuenta detallado** por deudor, listo para imprimir o guardar como PDF.
 - **Exportar a Excel**: el estado de cuenta de un deudor, o todos los deudores de una vez.
-- Eliminar movimientos o deudores individuales.
-- Buscar y ordenar por mayor deuda, nombre o más reciente.
-- Resumen general: total por cobrar, deudores activos y deudores al día.
-- Exportar/importar un respaldo en formato `.json` (útil para migrar desde la versión anterior o como copia de seguridad extra).
 
-> La exportación a Excel usa [SheetJS](https://sheetjs.com) y la sincronización usa el SDK de [Firebase](https://firebase.google.com), ambos cargados desde un CDN público.
+**Ingresos por Alquileres** (segunda pestaña de la app)
+- Registrar propiedades rentadas con arrendatario, canon de arrendamiento mensual y fecha de vencimiento.
+- **Cobro automático del canon**: cuando llega la fecha de vencimiento, la app agrega sola un cargo por el monto del canon (con descripción "Pago") y calcula el siguiente vencimiento un mes después.
+- Registrar abonos del arrendatario y otros cargos (préstamos, reparaciones, etc.).
+- Deuda inicial opcional al crear la propiedad (puede quedar en $0.00).
+- Ver y **editar el detalle de cualquier movimiento** (fecha, monto, concepto), incluyendo los cargos automáticos.
+- **Estado de cuenta detallado** por propiedad, listo para imprimir o guardar como PDF.
+- **Exportar a Excel**: el estado de cuenta de una propiedad, o todo junto con los deudores.
+- Resumen con total por cobrar, canon mensual total, cantidad de propiedades y cuántas están al día.
+
+> **Importante sobre el cobro automático**: como esta app no tiene un servidor propio corriendo todo el tiempo, el cargo mensual no aparece exactamente al segundo del vencimiento — se genera la **próxima vez que abras la app** (en cualquier dispositivo) después de esa fecha. Si dejas la app abierta y pasas de un día a otro, también se revisa automáticamente. En la práctica, mientras abras la app con cierta regularidad, nunca vas a "perderte" un cobro.
+
+**General**
+- Eliminar movimientos, deudores o propiedades individuales.
+- Buscar y ordenar por mayor deuda, nombre o más reciente (en ambos módulos).
+- Exportar/importar un respaldo en formato `.json` con todos los datos (deudores y propiedades juntos).
+
+> La exportación a Excel usa [SheetJS](https://sheetjs.com) y la sincronización usa el SDK de [Firebase](https://firebase.google.com), ambos cargados desde un CDN público. El botón "Exportar todo a Excel" del pie de página genera un solo archivo con hojas de resumen y de detalle tanto de tus deudores como de tus propiedades en alquiler.

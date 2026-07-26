@@ -417,3 +417,35 @@ fieldset.deuda-inicial legend{font-size:.8rem; font-weight:600; color:var(--ink)
 .auth-olvide{display:block; margin:0 auto; font-size:.78rem;}
 .auth-nota{font-size:.72rem; color:var(--ink-soft); text-align:center; margin-top:10px;}
 .auth-usuario{font-size:.78rem; color:var(--ink-soft); margin-right:auto; align-self:center;}
+
+/* ---------- Pestañas de modo ---------- */
+.modo-tabs{
+  max-width:1080px; margin:0 auto;
+  display:flex; gap:4px;
+  padding:0 24px;
+}
+.tab-modo{
+  background:none; border:none;
+  color:#9BA6AE; font-size:.86rem; font-weight:600;
+  padding:10px 16px 12px;
+  border-bottom:3px solid transparent;
+}
+.tab-modo:hover{color:var(--paper);}
+.tab-modo.activo{color:var(--paper); border-bottom-color:var(--amber);}
+
+/* ---------- Resumen de alquileres ---------- */
+.resumen-alquileres{
+  display:flex; gap:14px; flex-wrap:wrap;
+  background:var(--card-bg); border:1px solid var(--paper-line); border-radius:var(--radius);
+  padding:14px 20px; margin-bottom:22px; box-shadow:var(--shadow);
+}
+.resumen-item{display:flex; flex-direction:column; gap:2px; min-width:110px;}
+.resumen-label{font-size:.68rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft);}
+.resumen-valor{font-family:var(--font-mono); font-size:1.1rem; font-weight:600; color:var(--ink);}
+
+.detalle-canon-info{font-family:var(--font-mono); font-size:.78rem;}
+.label-inline{display:flex; flex-direction:column; gap:5px; font-size:.8rem; color:var(--ink-soft); font-weight:500;}
+.label-inline input{
+  padding:9px 12px; border:1px solid var(--paper-line); border-radius:8px; font-size:.88rem; background:var(--card-bg); color:var(--ink);
+}
+.tx-automatica{font-size:.68rem; color:var(--amber-dark); background:#F3E7D2; padding:1px 6px; border-radius:8px; margin-left:6px;}

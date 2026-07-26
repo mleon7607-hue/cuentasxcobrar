@@ -75,9 +75,13 @@
       </div>
     </div>
   </div>
+  <nav class="modo-tabs">
+    <button class="tab-modo activo" id="tabDeudores" data-modo="deudores">Cuentas × Cobrar</button>
+    <button class="tab-modo" id="tabPropiedades" data-modo="propiedades">Ingresos por Alquileres</button>
+  </nav>
 </header>
 
-<main class="app-main">
+<main class="app-main" id="vistaDeudores">
 
   <section class="toolbar">
     <input type="search" id="buscador" placeholder="Buscar deudor por nombre, teléfono o nota…" autocomplete="off">
@@ -95,6 +99,48 @@
       <p class="estado-vacio-sello">∅</p>
       <p>Todavía no has registrado ningún deudor.</p>
       <button class="btn btn-primary" id="btnNuevoDeudorVacio">Agregar el primero</button>
+    </div>
+  </section>
+
+</main>
+
+<main class="app-main" id="vistaPropiedades" hidden>
+
+  <section class="resumen-alquileres">
+    <div class="resumen-item">
+      <span class="resumen-label">Por cobrar</span>
+      <span class="resumen-valor" id="sumPropPorCobrar">$0.00</span>
+    </div>
+    <div class="resumen-item">
+      <span class="resumen-label">Canon mensual total</span>
+      <span class="resumen-valor" id="sumPropCanonTotal">$0.00</span>
+    </div>
+    <div class="resumen-item">
+      <span class="resumen-label">Propiedades</span>
+      <span class="resumen-valor" id="sumPropActivas">0</span>
+    </div>
+    <div class="resumen-item">
+      <span class="resumen-label">Al día</span>
+      <span class="resumen-valor" id="sumPropAlDia">0</span>
+    </div>
+  </section>
+
+  <section class="toolbar">
+    <input type="search" id="buscadorProp" placeholder="Buscar propiedad por nombre, arrendatario o teléfono…" autocomplete="off">
+    <select id="ordenSelectProp">
+      <option value="saldo-desc">Mayor deuda primero</option>
+      <option value="nombre-asc">Nombre (A–Z)</option>
+      <option value="reciente">Más reciente</option>
+    </select>
+    <button class="btn btn-primary" id="btnNuevaPropiedad">+ Nueva propiedad</button>
+  </section>
+
+  <section class="lista-wrap">
+    <div id="listaPropiedades" class="lista-deudores"></div>
+    <div id="estadoVacioProp" class="estado-vacio" hidden>
+      <p class="estado-vacio-sello">∅</p>
+      <p>Todavía no has registrado ninguna propiedad.</p>
+      <button class="btn btn-primary" id="btnNuevaPropiedadVacio">Agregar la primera</button>
     </div>
   </section>
 
@@ -287,6 +333,135 @@
       <button class="btn btn-ghost" id="btnEditarTx">Editar movimiento</button>
       <button class="btn btn-link btn-peligro" id="btnEliminarTxDetalle">Eliminar movimiento</button>
     </div>
+  </div>
+</div>
+
+<!-- Panel de detalle de propiedad (alquileres) -->
+<div class="overlay" id="overlayDetallePropiedad" hidden>
+  <aside class="panel-detalle" id="panelDetallePropiedad" role="dialog" aria-modal="true" aria-labelledby="detallePropNombre">
+    <button class="btn-cerrar" id="btnCerrarDetallePropiedad" aria-label="Cerrar">✕</button>
+
+    <div class="detalle-header">
+      <div class="detalle-sello" id="detallePropSello">$0.00</div>
+      <h2 id="detallePropNombre">—</h2>
+      <p class="detalle-meta" id="detallePropMeta"></p>
+      <p class="detalle-meta detalle-canon-info" id="detallePropCanonInfo"></p>
+
+      <div class="detalle-editar" id="detallePropEditar" hidden>
+        <input type="text" id="editPropNombre" placeholder="Nombre / dirección de la propiedad">
+        <input type="text" id="editPropArrendatario" placeholder="Arrendatario">
+        <input type="text" id="editPropTelefono" placeholder="Teléfono (opcional)">
+        <label class="label-inline">
+          Canon de arrendamiento mensual
+          <input type="number" id="editPropCanon" min="0.01" step="0.01">
+        </label>
+        <label class="label-inline">
+          Próximo vencimiento
+          <input type="date" id="editPropVencimiento">
+        </label>
+        <textarea id="editPropNotas" placeholder="Notas (opcional)" rows="2"></textarea>
+        <div class="fila-botones">
+          <button class="btn btn-primary" id="btnGuardarEdicionProp">Guardar</button>
+          <button class="btn btn-ghost" id="btnCancelarEdicionProp">Cancelar</button>
+        </div>
+      </div>
+      <div class="detalle-acciones">
+        <button class="btn btn-link" id="btnEditarPropiedad">Editar datos</button>
+        <button class="btn btn-link" id="btnVerEstadoCuentaProp">Ver estado de cuenta detallado</button>
+        <button class="btn btn-link btn-peligro" id="btnEliminarPropiedad">Eliminar propiedad</button>
+      </div>
+    </div>
+
+    <div class="detalle-nuevas-acciones">
+      <button class="btn btn-deuda" id="btnRegistrarCargo">+ Registrar cargo</button>
+      <button class="btn btn-abono" id="btnRegistrarAbonoProp">+ Registrar abono</button>
+    </div>
+
+    <form class="form-transaccion" id="formTransaccionProp" hidden>
+      <h3 id="formTransaccionPropTitulo">Registrar cargo</h3>
+      <label>
+        Monto
+        <input type="number" id="txPropMonto" min="0.01" step="0.01" placeholder="0.00" required>
+      </label>
+      <label>
+        Concepto / descripción
+        <input type="text" id="txPropConcepto" placeholder="Ej: préstamo, reparación, otro cargo…">
+      </label>
+      <label>
+        Fecha
+        <input type="date" id="txPropFecha" required>
+      </label>
+      <div class="fila-botones">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <button type="button" class="btn btn-ghost" id="btnCancelarTxProp">Cancelar</button>
+      </div>
+    </form>
+
+    <div class="detalle-historial">
+      <h3>Historial</h3>
+      <table class="tabla-historial">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Concepto</th>
+            <th class="col-monto">Monto</th>
+            <th class="col-monto">Saldo</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tablaHistorialPropBody"></tbody>
+      </table>
+      <p class="historial-vacio" id="historialPropVacio" hidden>Sin movimientos todavía.</p>
+    </div>
+  </aside>
+</div>
+
+<!-- Modal nueva propiedad (alquileres) -->
+<div class="overlay" id="overlayNuevaPropiedad" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloModalNuevaPropiedad">
+    <button class="btn-cerrar" id="btnCerrarNuevaPropiedad" aria-label="Cerrar">✕</button>
+    <h2 id="tituloModalNuevaPropiedad">Nueva propiedad</h2>
+    <form id="formNuevaPropiedad">
+      <label>
+        Nombre / dirección de la propiedad
+        <input type="text" id="nuevoPropNombre" required placeholder="Ej: Apto 3B, Calle 45">
+      </label>
+      <label>
+        Arrendatario
+        <input type="text" id="nuevoPropArrendatario" required placeholder="Ej: Carlos Pérez">
+      </label>
+      <label>
+        Teléfono <span class="opcional">(opcional)</span>
+        <input type="text" id="nuevoPropTelefono" placeholder="(305) 555-0100">
+      </label>
+      <label>
+        Canon de arrendamiento mensual
+        <input type="number" id="nuevoPropCanon" min="0.01" step="0.01" required placeholder="0.00">
+      </label>
+      <label>
+        Fecha de vencimiento (próximo cobro)
+        <input type="date" id="nuevoPropVencimiento" required>
+      </label>
+      <fieldset class="deuda-inicial">
+        <legend>Deuda inicial <span class="opcional">(puede quedar en $0.00)</span></legend>
+        <label>
+          Monto
+          <input type="number" id="nuevoPropMontoInicial" min="0" step="0.01" value="0" placeholder="0.00">
+        </label>
+        <label>
+          Concepto / descripción
+          <input type="text" id="nuevoPropConceptoInicial" placeholder="Ej: saldo pendiente de meses anteriores">
+        </label>
+      </fieldset>
+      <label>
+        Notas <span class="opcional">(opcional)</span>
+        <textarea id="nuevoPropNotas" rows="2" placeholder="Cualquier detalle adicional"></textarea>
+      </label>
+      <div class="fila-botones">
+        <button type="submit" class="btn btn-primary">Guardar propiedad</button>
+        <button type="button" class="btn btn-ghost" id="btnCancelarNuevaPropiedad">Cancelar</button>
+      </div>
+    </form>
   </div>
 </div>
 
