@@ -1,36 +1,49 @@
 /* ==========================================================
    Cuentas × Cobrar
-   App de control de deudores — persistencia 100% local (localStorage)
+   App de control de deudores — persistencia en la nube (Firebase)
+   con sincronización automática entre dispositivos.
    ========================================================== */
 
-const STORAGE_KEY = "cuentasXCobrar_v1";
+/* ---------- Firebase ---------- */
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+  console.warn("Persistencia offline no disponible:", err.code);
+});
+
+const COLECCION = "cuentasXCobrarUsuarios";
+let unsuscribirEstado = null;
+let modoAuth = "login"; // 'login' | 'signup'
 
 /* ---------- Estado ---------- */
-let estado = cargarEstado();
+let estado = { deudores: [] };
 let deudorActivoId = null;
 let modoTx = null; // 'deuda' | 'abono'
 let txDetalleActivoId = null;
 
-function cargarEstado(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return { deudores: [] };
-    const data = JSON.parse(raw);
-    if(!Array.isArray(data.deudores)) return { deudores: [] };
-    return data;
-  }catch(e){
-    console.error("No se pudo leer el almacenamiento local:", e);
-    return { deudores: [] };
-  }
+function guardarEstado(){
+  const user = auth.currentUser;
+  if(!user){ mostrarToast("Tu sesión expiró. Vuelve a iniciar sesión."); return; }
+  db.collection(COLECCION).doc(user.uid).set(estado).catch((e) => {
+    console.error(e);
+    mostrarToast("No se pudo guardar en la nube. Revisa tu conexión.");
+  });
 }
 
-function guardarEstado(){
-  try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(estado));
-  }catch(e){
-    mostrarToast("No se pudo guardar. ¿El navegador está en modo privado?");
-    console.error(e);
-  }
+function suscribirEstado(uid){
+  if(unsuscribirEstado) unsuscribirEstado();
+  unsuscribirEstado = db.collection(COLECCION).doc(uid).onSnapshot(
+    (snap) => {
+      estado = (snap.exists && Array.isArray(snap.data().deudores)) ? snap.data() : { deudores: [] };
+      render();
+    },
+    (err) => {
+      console.error(err);
+      mostrarToast("No se pudo sincronizar con la nube.");
+    }
+  );
 }
 
 function generarId(){
@@ -729,5 +742,90 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-/* ---------- Inicio ---------- */
-render();
+/* ==========================================================
+   Autenticación
+   ========================================================== */
+const MENSAJES_ERROR_AUTH = {
+  "auth/invalid-email": "El correo no parece válido.",
+  "auth/user-not-found": "No existe una cuenta con ese correo.",
+  "auth/wrong-password": "La contraseña es incorrecta.",
+  "auth/invalid-credential": "Correo o contraseña incorrectos.",
+  "auth/email-already-in-use": "Ya existe una cuenta con ese correo. Intenta iniciar sesión.",
+  "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
+  "auth/too-many-requests": "Demasiados intentos. Espera un momento y vuelve a intentar.",
+  "auth/network-request-failed": "No hay conexión a internet."
+};
+
+function mostrarErrorAuth(err){
+  const el = document.getElementById("authError");
+  el.textContent = MENSAJES_ERROR_AUTH[err.code] || "No se pudo completar la acción. Intenta de nuevo.";
+  el.hidden = false;
+}
+
+function limpiarErrorAuth(){
+  document.getElementById("authError").hidden = true;
+}
+
+function actualizarUIAuthModo(){
+  const submit = document.getElementById("btnAuthSubmit");
+  const toggleTexto = document.getElementById("authToggleTexto");
+  const toggleBtn = document.getElementById("btnAuthToggle");
+  if(modoAuth === "login"){
+    submit.textContent = "Iniciar sesión";
+    toggleTexto.textContent = "¿Primera vez aquí?";
+    toggleBtn.textContent = "Crear cuenta";
+  } else {
+    submit.textContent = "Crear cuenta";
+    toggleTexto.textContent = "¿Ya tienes una cuenta?";
+    toggleBtn.textContent = "Iniciar sesión";
+  }
+}
+
+function alternarModoAuth(){
+  modoAuth = modoAuth === "login" ? "signup" : "login";
+  limpiarErrorAuth();
+  actualizarUIAuthModo();
+}
+
+function enviarFormAuth(ev){
+  ev.preventDefault();
+  limpiarErrorAuth();
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const boton = document.getElementById("btnAuthSubmit");
+  boton.disabled = true;
+
+  const accion = modoAuth === "signup"
+    ? auth.createUserWithEmailAndPassword(email, password)
+    : auth.signInWithEmailAndPassword(email, password);
+
+  accion
+    .catch((err) => mostrarErrorAuth(err))
+    .finally(() => { boton.disabled = false; });
+}
+
+function cerrarSesion(){
+  if(!confirm("¿Cerrar sesión en este dispositivo?")) return;
+  auth.signOut();
+}
+
+document.getElementById("formAuth").addEventListener("submit", enviarFormAuth);
+document.getElementById("btnAuthToggle").addEventListener("click", alternarModoAuth);
+document.getElementById("btnCerrarSesion").addEventListener("click", cerrarSesion);
+
+auth.onAuthStateChanged((user) => {
+  if(user){
+    document.getElementById("authGate").hidden = true;
+    document.getElementById("appContent").hidden = false;
+    document.getElementById("authUsuario").textContent = user.email;
+    document.getElementById("formAuth").reset();
+    limpiarErrorAuth();
+    suscribirEstado(user.uid);
+  } else {
+    if(unsuscribirEstado){ unsuscribirEstado(); unsuscribirEstado = null; }
+    estado = { deudores: [] };
+    deudorActivoId = null;
+    document.getElementById("appContent").hidden = true;
+    document.getElementById("authGate").hidden = false;
+  }
+});

@@ -14,6 +14,42 @@
 
 <div class="paper-bg" aria-hidden="true"></div>
 
+<!-- Pantalla de acceso (login / crear cuenta) -->
+<div class="auth-gate" id="authGate">
+  <div class="auth-card">
+    <div class="brand auth-brand">
+      <span class="brand-mark">×</span>
+      <div>
+        <h1>Cuentas <span class="brand-mark-inline">×</span> Cobrar</h1>
+        <p class="brand-sub">Tu libro de préstamos, sincronizado en la nube</p>
+      </div>
+    </div>
+
+    <form id="formAuth">
+      <label>
+        Correo electrónico
+        <input type="email" id="authEmail" required autocomplete="username" placeholder="tucorreo@ejemplo.com">
+      </label>
+      <label>
+        Contraseña
+        <input type="password" id="authPassword" required autocomplete="current-password" minlength="6" placeholder="Mínimo 6 caracteres">
+      </label>
+      <p class="auth-error" id="authError" hidden></p>
+      <div class="fila-botones">
+        <button type="submit" class="btn btn-primary" id="btnAuthSubmit">Iniciar sesión</button>
+      </div>
+    </form>
+
+    <p class="auth-toggle">
+      <span id="authToggleTexto">¿Primera vez aquí?</span>
+      <button type="button" class="btn-link" id="btnAuthToggle">Crear cuenta</button>
+    </p>
+    <p class="auth-nota">Esta cuenta protege el acceso a tus datos y los sincroniza automáticamente entre todos tus dispositivos.</p>
+  </div>
+</div>
+
+<div id="appContent" hidden>
+
 <header class="app-header">
   <div class="header-inner">
     <div class="brand">
@@ -64,14 +100,18 @@
 </main>
 
 <footer class="app-footer">
-  <p>Los datos se guardan solo en este navegador. Exporta una copia de respaldo con frecuencia.</p>
+  <p>Tus datos se sincronizan automáticamente en la nube entre tus dispositivos. Aun así, exporta un respaldo de vez en cuando.</p>
   <div class="footer-actions">
+    <span class="auth-usuario" id="authUsuario"></span>
     <button class="btn btn-ghost" id="btnExportarExcelTodo">Exportar todo a Excel</button>
     <button class="btn btn-ghost" id="btnExportar">Exportar respaldo (.json)</button>
     <label class="btn btn-ghost" for="inputImportar">Importar respaldo</label>
     <input type="file" id="inputImportar" accept="application/json" hidden>
+    <button class="btn btn-ghost" id="btnCerrarSesion">Cerrar sesión</button>
   </div>
 </footer>
+
+</div><!-- /#appContent -->
 
 <!-- Panel de detalle de deudor -->
 <div class="overlay" id="overlayDetalle" hidden>
@@ -252,6 +292,10 @@
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

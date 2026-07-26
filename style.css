@@ -380,3 +380,39 @@ fieldset.deuda-inicial legend{font-size:.8rem; font-weight:600; color:var(--ink)
 .tx-detalle-datos dd{margin:2px 0 6px; font-family:var(--font-mono);}
 .tx-detalle-datos dd.no-mono{font-family:var(--font-body);}
 .tx-detalle-datos .dd-full{grid-column:1 / -1;}
+
+/* ---------- Pantalla de acceso ---------- */
+.auth-gate{
+  position:relative; z-index:5;
+  min-height:100vh;
+  display:flex; align-items:center; justify-content:center;
+  padding:24px;
+}
+.auth-card{
+  width:min(400px, 100%);
+  background:var(--card-bg);
+  border:1px solid var(--paper-line);
+  border-radius:14px;
+  box-shadow:var(--shadow);
+  padding:32px 28px;
+}
+.auth-brand{justify-content:center; text-align:center; flex-direction:column; gap:6px; margin-bottom:22px;}
+.auth-brand .brand-mark{color:var(--amber);}
+.auth-brand h1{color:var(--ink); font-size:1.5rem;}
+.auth-brand .brand-mark-inline{color:var(--amber);}
+.auth-brand .brand-sub{color:var(--ink-soft);}
+#formAuth{display:flex; flex-direction:column; gap:14px;}
+#formAuth label{display:flex; flex-direction:column; gap:5px; font-size:.8rem; color:var(--ink-soft); font-weight:500;}
+#formAuth input{
+  padding:10px 12px; border:1px solid var(--paper-line); border-radius:8px;
+  font-size:.92rem; color:var(--ink); background:#fff;
+}
+#formAuth input:focus{outline:2px solid var(--amber); outline-offset:1px;}
+.auth-error{
+  background:var(--debt-red-bg); color:var(--debt-red);
+  border-radius:8px; padding:9px 12px; font-size:.82rem; margin:0;
+}
+.auth-toggle{text-align:center; font-size:.84rem; color:var(--ink-soft); margin:16px 0 6px;}
+.auth-toggle .btn-link{font-size:.84rem; margin-left:4px;}
+.auth-nota{font-size:.72rem; color:var(--ink-soft); text-align:center; margin-top:10px;}
+.auth-usuario{font-size:.78rem; color:var(--ink-soft); margin-right:auto; align-self:center;}
