@@ -414,5 +414,6 @@ fieldset.deuda-inicial legend{font-size:.8rem; font-weight:600; color:var(--ink)
 }
 .auth-toggle{text-align:center; font-size:.84rem; color:var(--ink-soft); margin:16px 0 6px;}
 .auth-toggle .btn-link{font-size:.84rem; margin-left:4px;}
+.auth-olvide{display:block; margin:0 auto; font-size:.78rem;}
 .auth-nota{font-size:.72rem; color:var(--ink-soft); text-align:center; margin-top:10px;}
 .auth-usuario{font-size:.78rem; color:var(--ink-soft); margin-right:auto; align-self:center;}

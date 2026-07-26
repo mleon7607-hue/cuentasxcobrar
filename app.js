@@ -758,6 +758,8 @@ const MENSAJES_ERROR_AUTH = {
 
 function mostrarErrorAuth(err){
   const el = document.getElementById("authError");
+  el.style.background = "";
+  el.style.color = "";
   el.textContent = MENSAJES_ERROR_AUTH[err.code] || "No se pudo completar la acción. Intenta de nuevo.";
   el.hidden = false;
 }
@@ -809,8 +811,29 @@ function cerrarSesion(){
   auth.signOut();
 }
 
+function enviarRecuperacionContrasena(){
+  limpiarErrorAuth();
+  const email = document.getElementById("authEmail").value.trim();
+  if(!email){
+    const el = document.getElementById("authError");
+    el.textContent = "Escribe tu correo arriba primero, y luego toca este enlace.";
+    el.hidden = false;
+    return;
+  }
+  auth.sendPasswordResetEmail(email)
+    .then(() => {
+      const el = document.getElementById("authError");
+      el.style.background = "var(--paid-green-bg)";
+      el.style.color = "var(--paid-green)";
+      el.textContent = "Te enviamos un correo con instrucciones para restablecer tu contraseña.";
+      el.hidden = false;
+    })
+    .catch((err) => mostrarErrorAuth(err));
+}
+
 document.getElementById("formAuth").addEventListener("submit", enviarFormAuth);
 document.getElementById("btnAuthToggle").addEventListener("click", alternarModoAuth);
+document.getElementById("btnOlvideContrasena").addEventListener("click", enviarRecuperacionContrasena);
 document.getElementById("btnCerrarSesion").addEventListener("click", cerrarSesion);
 
 auth.onAuthStateChanged((user) => {
