@@ -158,6 +158,7 @@ input,select,textarea{font-family:inherit;}
 .sello.aldia{color:var(--paid-green); background:var(--paid-green-bg);}
 .sello.favor{color:var(--amber-dark); background:#F3E7D2;}
 .tarjeta-ultimo{font-size:.78rem; color:var(--ink-soft); border-top:1px dashed var(--paper-line); padding-top:8px;}
+.tarjeta-vencimiento{font-size:.78rem; color:var(--amber-dark); margin:0;}
 
 .estado-vacio{
   text-align:center; padding:60px 20px; color:var(--ink-soft);

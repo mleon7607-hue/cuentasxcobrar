@@ -383,21 +383,30 @@ function cancelarEditarTx(){
 
 function guardarEditarTx(ev){
   ev.preventDefault();
-  const entidad = getEntidadActivaParaTx();
-  const tx = getTxActivo();
-  if(!entidad || !tx) return;
-  const monto = parseFloat(document.getElementById("editTxMonto").value);
-  if(isNaN(monto) || monto <= 0){ mostrarToast("Ingresa un monto válido."); return; }
-  tx.monto = Math.round(monto * 100) / 100;
-  tx.concepto = document.getElementById("editTxConcepto").value.trim();
-  tx.fecha = document.getElementById("editTxFecha").value || tx.fecha;
-  if(contextoTxActivo === "deudor" && tx.tipo === "deuda") tx.metodo = document.getElementById("editTxMetodo").value;
-  guardarEstado();
-  document.getElementById("formEditarTx").hidden = true;
-  document.getElementById("txDetalleAcciones").hidden = false;
-  renderTxDetalleVista(entidad, tx);
-  render();
-  mostrarToast("Movimiento actualizado.");
+  try{
+    const entidad = getEntidadActivaParaTx();
+    const tx = getTxActivo();
+    if(!entidad || !tx){
+      mostrarToast("No se pudo encontrar el movimiento. Cierra esta ventana y vuelve a intentarlo.");
+      console.warn("guardarEditarTx: entidad o tx no encontrados", { contextoTxActivo, propiedadActivaId, deudorActivoId, txDetalleActivoId });
+      return;
+    }
+    const monto = parseFloat(document.getElementById("editTxMonto").value);
+    if(isNaN(monto) || monto <= 0){ mostrarToast("Ingresa un monto válido."); return; }
+    tx.monto = Math.round(monto * 100) / 100;
+    tx.concepto = document.getElementById("editTxConcepto").value.trim();
+    tx.fecha = document.getElementById("editTxFecha").value || tx.fecha;
+    if(contextoTxActivo === "deudor" && tx.tipo === "deuda") tx.metodo = document.getElementById("editTxMetodo").value;
+    guardarEstado();
+    document.getElementById("formEditarTx").hidden = true;
+    document.getElementById("txDetalleAcciones").hidden = false;
+    renderTxDetalleVista(entidad, tx);
+    render();
+    mostrarToast("Movimiento actualizado.");
+  }catch(e){
+    console.error("Error en guardarEditarTx:", e);
+    mostrarToast("Ocurrió un error al guardar. Intenta de nuevo.");
+  }
 }
 
 function eliminarTxDesdeDetalle(){
@@ -837,7 +846,8 @@ function renderListaPropiedades(){
           </div>
           <span class="sello ${selloClase}">${selloTexto}</span>
         </div>
-        ${ultimo ? `<p class="tarjeta-ultimo">Último movimiento: ${fmtFecha(ultimo.fecha)} · ${ultimo.tipo === "cargo" ? "cargo" : "abono"} de ${fmtMoneda.format(ultimo.monto)}</p>` : `<p class="tarjeta-ultimo">Próximo cobro: ${fmtFecha(p.proximoVencimiento)}</p>`}
+        <p class="tarjeta-vencimiento">Próximo cobro automático: <strong>${fmtFecha(p.proximoVencimiento)}</strong></p>
+        ${ultimo ? `<p class="tarjeta-ultimo">Último movimiento: ${fmtFecha(ultimo.fecha)} · ${ultimo.tipo === "cargo" ? "cargo" : "abono"} de ${fmtMoneda.format(ultimo.monto)}</p>` : `<p class="tarjeta-ultimo">Sin movimientos todavía</p>`}
       </article>
     `;
   }).join("");
