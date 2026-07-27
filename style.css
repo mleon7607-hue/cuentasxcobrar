@@ -279,6 +279,7 @@ fieldset.deuda-inicial{
 }
 fieldset.deuda-inicial legend{font-size:.8rem; font-weight:600; color:var(--ink); padding:0 6px;}
 .opcional{font-weight:400; color:#8B95A0; font-size:.75rem;}
+.ayuda-campo{font-size:.76rem; color:var(--ink-soft); margin:-8px 0 0;}
 
 #formNuevoDeudor{display:flex; flex-direction:column; gap:14px; margin-top:16px;}
 
@@ -445,6 +446,13 @@ fieldset.deuda-inicial legend{font-size:.8rem; font-weight:600; color:var(--ink)
 .resumen-valor{font-family:var(--font-mono); font-size:1.1rem; font-weight:600; color:var(--ink);}
 
 .detalle-canon-info{font-family:var(--font-mono); font-size:.78rem;}
+.vencimiento-badge{
+  display:flex; flex-direction:column; gap:4px;
+  background:#F3E7D2; border:1.5px solid var(--amber);
+  border-radius:10px; padding:10px 16px; margin:10px 0;
+  font-size:.85rem; color:var(--amber-dark); text-align:left;
+}
+.vencimiento-badge strong{font-family:var(--font-mono);}
 .label-inline{display:flex; flex-direction:column; gap:5px; font-size:.8rem; color:var(--ink-soft); font-weight:500;}
 .label-inline input{
   padding:9px 12px; border:1px solid var(--paper-line); border-radius:8px; font-size:.88rem; background:var(--card-bg); color:var(--ink);
