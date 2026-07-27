@@ -304,6 +304,31 @@ function getEntidadActivaParaTx(){
   return contextoTxActivo === "propiedad" ? getPropiedadActiva() : getDeudorActivo();
 }
 
+function buscarPorTxId(txId){
+  for(const d of estado.deudores){
+    const t = d.transacciones.find(x => x.id === txId);
+    if(t) return { entidad: d, tx: t, contexto: "deudor" };
+  }
+  for(const p of estado.propiedades){
+    const t = p.transacciones.find(x => x.id === txId);
+    if(t) return { entidad: p, tx: t, contexto: "propiedad" };
+  }
+  return null;
+}
+
+function resolverTxActivo(){
+  if(!txDetalleActivoId) return null;
+  const entidadRapida = getEntidadActivaParaTx();
+  if(entidadRapida){
+    const tx = entidadRapida.transacciones.find(t => t.id === txDetalleActivoId);
+    if(tx) return { entidad: entidadRapida, tx, contexto: contextoTxActivo };
+  }
+  // Camino de respaldo: si el contexto quedó desincronizado, busca en todos lados por ID
+  const encontrado = buscarPorTxId(txDetalleActivoId);
+  if(encontrado) contextoTxActivo = encontrado.contexto; // autocorregir
+  return encontrado;
+}
+
 function transaccionesOrdenadas(d){
   return [...d.transacciones].sort((a,b) => a.fecha.localeCompare(b.fecha) || a.id.localeCompare(b.id));
 }
@@ -358,9 +383,8 @@ function cerrarTxDetalle(){
 }
 
 function getTxActivo(){
-  const entidad = getEntidadActivaParaTx();
-  if(!entidad) return null;
-  return entidad.transacciones.find(t => t.id === txDetalleActivoId) || null;
+  const r = resolverTxActivo();
+  return r ? r.tx : null;
 }
 
 function abrirEditarTx(){
@@ -384,13 +408,13 @@ function cancelarEditarTx(){
 function guardarEditarTx(ev){
   ev.preventDefault();
   try{
-    const entidad = getEntidadActivaParaTx();
-    const tx = getTxActivo();
-    if(!entidad || !tx){
+    const r = resolverTxActivo();
+    if(!r){
       mostrarToast("No se pudo encontrar el movimiento. Cierra esta ventana y vuelve a intentarlo.");
       console.warn("guardarEditarTx: entidad o tx no encontrados", { contextoTxActivo, propiedadActivaId, deudorActivoId, txDetalleActivoId });
       return;
     }
+    const { entidad, tx } = r;
     const monto = parseFloat(document.getElementById("editTxMonto").value);
     if(isNaN(monto) || monto <= 0){ mostrarToast("Ingresa un monto válido."); return; }
     tx.monto = Math.round(monto * 100) / 100;
@@ -410,9 +434,12 @@ function guardarEditarTx(ev){
 }
 
 function eliminarTxDesdeDetalle(){
-  const entidad = getEntidadActivaParaTx();
-  const tx = getTxActivo();
-  if(!entidad || !tx) return;
+  const r = resolverTxActivo();
+  if(!r){
+    mostrarToast("No se pudo encontrar el movimiento. Cierra esta ventana y vuelve a intentarlo.");
+    return;
+  }
+  const { entidad, tx } = r;
   if(!confirm("¿Eliminar este movimiento del historial? Esta acción no se puede deshacer.")) return;
   entidad.transacciones = entidad.transacciones.filter(t => t.id !== tx.id);
   guardarEstado();
