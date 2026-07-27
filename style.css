@@ -358,11 +358,17 @@ fieldset.deuda-inicial legend{font-size:.8rem; font-weight:600; color:var(--ink)
 }
 
 @media print{
-  body *{ visibility:hidden; }
-  #modalEstado, #modalEstado *{ visibility:visible; }
-  .overlay{ position:absolute; inset:auto; background:none; display:block; }
+  #authGate, #appContent, .toast,
+  #overlayDetalle, #overlayNuevo, #overlayTxDetalle,
+  #overlayDetallePropiedad, #overlayNuevaPropiedad,
+  #overlayDetalleGasto, #overlayNuevaCuentaGasto{
+    display:none !important;
+  }
+  #overlayEstado{
+    position:static; inset:auto; background:none; display:block;
+  }
   #modalEstado{
-    position:absolute; top:0; left:0; width:100%; box-shadow:none; padding:0; border-radius:0;
+    position:static; top:auto; left:auto; width:100%; box-shadow:none; padding:0; border-radius:0; max-height:none;
   }
   .no-print{ display:none !important; }
 }
