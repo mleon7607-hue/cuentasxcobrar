@@ -532,7 +532,7 @@ function guardarNuevoDeudor(ev){
     transacciones: []
   };
 
-  if(montoInicqal > 0){
+  if(montoInicial > 0){
     nuevo.transacciones.push({
       id: generarId(),
       fecha: hoyISO(),
