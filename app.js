@@ -19,13 +19,15 @@ let modoAuth = "login"; // 'login' | 'signup'
 let modoActual = "deudores"; // 'deudores' | 'propiedades'
 
 /* ---------- Estado ---------- */
-let estado = { deudores: [], propiedades: [] };
+let estado = { deudores: [], propiedades: [], cuentasGastos: [] };
 let deudorActivoId = null;
 let modoTx = null; // 'deuda' | 'abono'
 let txDetalleActivoId = null;
 let propiedadActivaId = null;
 let modoTxProp = null; // 'cargo' | 'abono'
-let estadoCuentaContexto = "deudor"; // 'deudor' | 'propiedad'
+let gastoActivoId = null;
+let modoTxGasto = null; // 'cargo' | 'abono'
+let estadoCuentaContexto = "deudor"; // 'deudor' | 'propiedad' | 'gasto'
 
 function guardarEstado(){
   const user = auth.currentUser;
@@ -43,7 +45,8 @@ function suscribirEstado(uid){
       const data = snap.exists ? snap.data() : {};
       estado = {
         deudores: Array.isArray(data.deudores) ? data.deudores : [],
-        propiedades: Array.isArray(data.propiedades) ? data.propiedades : []
+        propiedades: Array.isArray(data.propiedades) ? data.propiedades : [],
+        cuentasGastos: Array.isArray(data.cuentasGastos) ? data.cuentasGastos : []
       };
       render();
     },
@@ -100,6 +103,9 @@ function render(){
   renderResumenPropiedades();
   renderListaPropiedades();
   if(propiedadActivaId) renderDetallePropiedad();
+  renderResumenGastos();
+  renderListaGastos();
+  if(gastoActivoId) renderDetalleGasto();
 }
 
 function renderResumen(){
@@ -301,7 +307,9 @@ function esMontoPositivo(tipo){
 }
 
 function getEntidadActivaParaTx(){
-  return contextoTxActivo === "propiedad" ? getPropiedadActiva() : getDeudorActivo();
+  if(contextoTxActivo === "propiedad") return getPropiedadActiva();
+  if(contextoTxActivo === "gasto") return getGastoActivo();
+  return getDeudorActivo();
 }
 
 function buscarPorTxId(txId){
@@ -312,6 +320,10 @@ function buscarPorTxId(txId){
   for(const p of estado.propiedades){
     const t = p.transacciones.find(x => x.id === txId);
     if(t) return { entidad: p, tx: t, contexto: "propiedad" };
+  }
+  for(const g of estado.cuentasGastos){
+    const t = g.transacciones.find(x => x.id === txId);
+    if(t) return { entidad: g, tx: t, contexto: "gasto" };
   }
   return null;
 }
@@ -364,10 +376,12 @@ function renderTxDetalleVista(entidad, tx){
   const saldo = saldoHastaTx(entidad, tx.id);
   const esCargo = esMontoPositivo(tx.tipo);
   const esProp = contextoTxActivo === "propiedad";
-  const etiquetaTipo = esCargo ? (esProp ? "Cargo" : "Préstamo") : "Abono";
-  document.getElementById("txDetalleTitulo").textContent = esCargo ? (esProp ? "Detalle del cargo" : "Detalle del préstamo") : "Detalle del abono";
+  const esGasto = contextoTxActivo === "gasto";
+  const etiquetaTipo = esCargo ? ((esProp || esGasto) ? "Cargo" : "Préstamo") : "Abono";
+  const etiquetaEntidad = esProp ? "Propiedad" : (esGasto ? "Cuenta de gastos" : "Deudor");
+  document.getElementById("txDetalleTitulo").textContent = esCargo ? ((esProp || esGasto) ? "Detalle del cargo" : "Detalle del préstamo") : "Detalle del abono";
   document.getElementById("txDetalleDatos").innerHTML = `
-    <dt>${esProp ? "Propiedad" : "Deudor"}</dt><dd class="no-mono dd-full">${escapeHTML(entidad.nombre)}</dd>
+    <dt>${etiquetaEntidad}</dt><dd class="no-mono dd-full">${escapeHTML(entidad.nombre)}</dd>
     <dt>Fecha</dt><dd>${fmtFecha(tx.fecha)}</dd>
     <dt>Tipo</dt><dd class="no-mono">${etiquetaTipo}${tx.automatico ? ' <span class="tx-automatica">automático</span>' : ""}</dd>
     ${tx.metodo ? `<dt>Forma</dt><dd class="no-mono">${MODO_LABEL[tx.metodo] || "—"}</dd>` : ""}
@@ -518,7 +532,7 @@ function guardarNuevoDeudor(ev){
     transacciones: []
   };
 
-  if(montoInicial > 0){
+  if(montoInicqal > 0){
     nuevo.transacciones.push({
       id: generarId(),
       fecha: hoyISO(),
@@ -678,7 +692,7 @@ function exportarDeudorExcel(d){
 
 function exportarTodoExcel(){
   if(typeof XLSX === "undefined"){ mostrarToast("No se pudo cargar el módulo de Excel. Revisa tu conexión a internet."); return; }
-  if(estado.deudores.length === 0 && estado.propiedades.length === 0){
+  if(estado.deudores.length === 0 && estado.propiedades.length === 0 && estado.cuentasGastos.length === 0){
     mostrarToast("Todavía no hay datos para exportar.");
     return;
   }
@@ -740,6 +754,31 @@ function exportarTodoExcel(){
     });
   }
 
+  if(estado.cuentasGastos.length > 0){
+    // Hoja resumen de cuentas de gastos
+    const resumenGastoFilas = [["Cuenta","Notas","Creada","Total cargos","Total abonado","Saldo actual"]];
+    estado.cuentasGastos.forEach(g => {
+      const totalCargos = g.transacciones.filter(t => t.tipo === "cargo").reduce((a,t) => a + t.monto, 0);
+      const totalAbonado = g.transacciones.filter(t => t.tipo === "abono").reduce((a,t) => a + t.monto, 0);
+      resumenGastoFilas.push([
+        g.nombre, g.notas || "", fmtFecha(g.fechaCreacion),
+        totalCargos, totalAbonado, totalCargos - totalAbonado
+      ]);
+    });
+    const wsResumenGasto = XLSX.utils.aoa_to_sheet(resumenGastoFilas);
+    wsResumenGasto["!cols"] = [{wch:22},{wch:26},{wch:14},{wch:14},{wch:14},{wch:14}];
+    const nombreResumenGasto = nombreHojaValido("Resumen Gastos", usados);
+    XLSX.utils.book_append_sheet(wb, wsResumenGasto, nombreResumenGasto);
+
+    // Una hoja por cuenta de gastos con su historial
+    estado.cuentasGastos.forEach(g => {
+      const nombreHoja = nombreHojaValido(g.nombre, usados);
+      const ws = XLSX.utils.aoa_to_sheet(filasHistorialParaExcelGasto(g));
+      ws["!cols"] = [{wch:12},{wch:30},{wch:16},{wch:12},{wch:14}];
+      XLSX.utils.book_append_sheet(wb, ws, nombreHoja);
+    });
+  }
+
   XLSX.writeFile(wb, `cuentas-x-cobrar-${hoyISO()}.xlsx`);
   mostrarToast("Excel exportado.");
 }
@@ -753,8 +792,10 @@ function cambiarModo(modo){
   modoActual = modo;
   document.getElementById("vistaDeudores").hidden = modo !== "deudores";
   document.getElementById("vistaPropiedades").hidden = modo !== "propiedades";
+  document.getElementById("vistaGastos").hidden = modo !== "gastos";
   document.getElementById("tabDeudores").classList.toggle("activo", modo === "deudores");
   document.getElementById("tabPropiedades").classList.toggle("activo", modo === "propiedades");
+  document.getElementById("tabGastos").classList.toggle("activo", modo === "gastos");
 }
 
 /* ---------- Cálculos ---------- */
@@ -788,11 +829,12 @@ async function procesarVencimientosAutomaticos(){
       const data = snap.data();
       if(!Array.isArray(data.propiedades) || data.propiedades.length === 0) return;
       const hoy = hoyISO();
-      let cambios = false;
+      let huboAlgunCambio = false;
       const propiedades = data.propiedades.map((p) => {
         if(!p.proximoVencimiento || !p.canon) return p;
         let prox = p.proximoVencimiento;
         const transacciones = [...(p.transacciones || [])];
+        let cambioEnEsta = false;
         let iter = 0;
         while(prox <= hoy && iter < 60){
           transacciones.push({
@@ -804,12 +846,13 @@ async function procesarVencimientosAutomaticos(){
             automatico: true
           });
           prox = sumarUnMes(prox);
-          cambios = true;
+          cambioEnEsta = true;
           iter++;
         }
-        return cambios ? { ...p, transacciones, proximoVencimiento: prox } : p;
+        if(cambioEnEsta) huboAlgunCambio = true;
+        return cambioEnEsta ? { ...p, transacciones, proximoVencimiento: prox } : p;
       });
-      if(cambios) tx.update(docRef, { propiedades });
+      if(huboAlgunCambio) tx.update(docRef, { propiedades });
     });
   }catch(e){
     console.error("Error procesando vencimientos automáticos:", e);
@@ -918,8 +961,9 @@ function renderDetallePropiedad(){
   if(p.telefono) metaPartes.push(p.telefono);
   if(p.notas) metaPartes.push(p.notas);
   document.getElementById("detallePropMeta").textContent = metaPartes.join(" · ");
-  document.getElementById("detallePropCanonInfo").textContent =
-    `Canon: ${fmtMoneda.format(p.canon)}/mes · Próximo cobro automático: ${fmtFecha(p.proximoVencimiento)}`;
+  document.getElementById("detallePropCanonInfo").innerHTML =
+    `<span>Canon mensual: <strong>${fmtMoneda.format(p.canon)}</strong></span>` +
+    `<span>Próximo cobro automático: <strong>${fmtFecha(p.proximoVencimiento)}</strong></span>`;
 
   const tbody = document.getElementById("tablaHistorialPropBody");
   const historialVacio = document.getElementById("historialPropVacio");
@@ -980,6 +1024,7 @@ function abrirEdicionProp(){
   document.getElementById("editPropTelefono").value = p.telefono || "";
   document.getElementById("editPropCanon").value = p.canon;
   document.getElementById("editPropVencimiento").value = p.proximoVencimiento;
+  poblarSelectCuentasGastos(document.getElementById("editPropCuentaGastos"), p.cuentaGastosVinculadaId || "");
   document.getElementById("editPropNotas").value = p.notas || "";
   document.getElementById("detallePropEditar").hidden = false;
 }
@@ -998,6 +1043,7 @@ function guardarEdicionProp(){
   p.telefono = document.getElementById("editPropTelefono").value.trim();
   p.canon = Math.round(canon * 100) / 100;
   p.proximoVencimiento = vencimiento;
+  p.cuentaGastosVinculadaId = document.getElementById("editPropCuentaGastos").value || null;
   p.notas = document.getElementById("editPropNotas").value.trim();
   guardarEstado();
   document.getElementById("detallePropEditar").hidden = true;
@@ -1040,15 +1086,31 @@ function guardarTxProp(ev){
   if(isNaN(monto) || monto <= 0){ mostrarToast("Ingresa un monto válido."); return; }
   const fecha = document.getElementById("txPropFecha").value || hoyISO();
   const concepto = document.getElementById("txPropConcepto").value.trim();
+  const montoRedondeado = Math.round(monto * 100) / 100;
 
   p.transacciones.push({
     id: generarId(),
     fecha,
     tipo: modoTxProp,
     concepto,
-    monto: Math.round(monto * 100) / 100,
+    monto: montoRedondeado,
     automatico: false
   });
+
+  if(modoTxProp === "abono" && p.cuentaGastosVinculadaId){
+    const cuenta = estado.cuentasGastos.find(g => g.id === p.cuentaGastosVinculadaId);
+    if(cuenta){
+      cuenta.transacciones.push({
+        id: generarId(),
+        fecha,
+        tipo: "cargo",
+        concepto: `Pago recibido de ${p.nombre}`,
+        monto: montoRedondeado,
+        automatico: true
+      });
+    }
+  }
+
   guardarEstado();
   cancelarFormTxProp();
   render();
@@ -1060,6 +1122,7 @@ function abrirModalNuevaPropiedad(){
   document.getElementById("formNuevaPropiedad").reset();
   document.getElementById("nuevoPropMontoInicial").value = "0";
   document.getElementById("nuevoPropVencimiento").value = hoyISO();
+  poblarSelectCuentasGastos(document.getElementById("nuevoPropCuentaGastos"), "");
   document.getElementById("overlayNuevaPropiedad").hidden = false;
   document.getElementById("nuevoPropNombre").focus();
 }
@@ -1087,6 +1150,7 @@ function guardarNuevaPropiedad(ev){
     canon: Math.round(canon * 100) / 100,
     fechaCreacion: hoyISO(),
     proximoVencimiento: vencimiento,
+    cuentaGastosVinculadaId: document.getElementById("nuevoPropCuentaGastos").value || null,
     transacciones: []
   };
 
@@ -1228,6 +1292,394 @@ function exportarPropiedadExcel(p){
 }
 
 /* ==========================================================
+   Control Gastos
+   ========================================================== */
+
+/* ---------- Cálculos ---------- */
+function calcularSaldoGasto(g){
+  return g.transacciones.reduce((acc,t) => acc + (t.tipo === "cargo" ? t.monto : -t.monto), 0);
+}
+
+function ultimoMovimientoGasto(g){
+  if(g.transacciones.length === 0) return null;
+  return [...g.transacciones].sort((a,b) => b.fecha.localeCompare(a.fecha))[0];
+}
+
+/* ---------- Selector de vinculación (usado en propiedades) ---------- */
+function poblarSelectCuentasGastos(selectEl, valorActual){
+  const opciones = ['<option value="">Ninguna (no vincular)</option>']
+    .concat(estado.cuentasGastos.map(g => `<option value="${g.id}" ${g.id === valorActual ? "selected" : ""}>${escapeHTML(g.nombre)}</option>`));
+  selectEl.innerHTML = opciones.join("");
+}
+
+/* ---------- Resumen + lista ---------- */
+function renderResumenGastos(){
+  const saldoTotal = estado.cuentasGastos.reduce((acc,g) => acc + calcularSaldoGasto(g), 0);
+  document.getElementById("sumGastoSaldoTotal").textContent = fmtMoneda.format(saldoTotal);
+  document.getElementById("sumGastoCantidad").textContent = estado.cuentasGastos.length;
+}
+
+function renderListaGastos(){
+  const contenedor = document.getElementById("listaGastos");
+  const vacio = document.getElementById("estadoVacioGasto");
+  const busqueda = document.getElementById("buscadorGasto").value.trim().toLowerCase();
+  const orden = document.getElementById("ordenSelectGasto").value;
+
+  let lista = estado.cuentasGastos.filter(g => {
+    if(!busqueda) return true;
+    return (g.nombre || "").toLowerCase().includes(busqueda);
+  });
+
+  lista = lista.map(g => ({ g, saldo: calcularSaldoGasto(g) }));
+
+  if(orden === "saldo-desc") lista.sort((a,b) => b.saldo - a.saldo);
+  else if(orden === "nombre-asc") lista.sort((a,b) => a.g.nombre.localeCompare(b.g.nombre));
+  else if(orden === "reciente") lista.sort((a,b) => b.g.fechaCreacion.localeCompare(a.g.fechaCreacion));
+
+  if(estado.cuentasGastos.length === 0){
+    contenedor.innerHTML = "";
+    vacio.hidden = false;
+    return;
+  }
+  vacio.hidden = true;
+
+  contenedor.innerHTML = lista.map(({g, saldo}) => {
+    const ultimo = ultimoMovimientoGasto(g);
+    const selloClase = saldo < 0 ? "debe" : "aldia";
+    const selloTexto = fmtMoneda.format(saldo);
+
+    return `
+      <article class="tarjeta-deudor" data-id="${g.id}">
+        <div class="tarjeta-top">
+          <div>
+            <p class="tarjeta-nombre">${escapeHTML(g.nombre)}</p>
+            ${g.notas ? `<p class="tarjeta-meta">${escapeHTML(g.notas)}</p>` : ""}
+          </div>
+          <span class="sello ${selloClase}">${selloTexto}</span>
+        </div>
+        ${ultimo ? `<p class="tarjeta-ultimo">Último movimiento: ${fmtFecha(ultimo.fecha)} · ${ultimo.tipo === "cargo" ? "cargo" : "abono"} de ${fmtMoneda.format(ultimo.monto)}</p>` : `<p class="tarjeta-ultimo">Sin movimientos todavía</p>`}
+      </article>
+    `;
+  }).join("");
+
+  contenedor.querySelectorAll(".tarjeta-deudor").forEach(el => {
+    el.addEventListener("click", () => abrirDetalleGasto(el.dataset.id));
+  });
+}
+
+/* ---------- Panel de detalle ---------- */
+function abrirDetalleGasto(id){
+  gastoActivoId = id;
+  document.getElementById("formTransaccionGasto").hidden = true;
+  document.getElementById("detalleGastoEditar").hidden = true;
+  document.getElementById("overlayDetalleGasto").hidden = false;
+  renderDetalleGasto();
+}
+
+function cerrarDetalleGasto(){
+  gastoActivoId = null;
+  document.getElementById("overlayDetalleGasto").hidden = true;
+}
+
+function getGastoActivo(){
+  return estado.cuentasGastos.find(g => g.id === gastoActivoId);
+}
+
+function renderDetalleGasto(){
+  const g = getGastoActivo();
+  if(!g){ cerrarDetalleGasto(); return; }
+
+  const saldo = calcularSaldoGasto(g);
+  const sello = document.getElementById("detalleGastoSello");
+  sello.className = "detalle-sello";
+  sello.classList.add(saldo < 0 ? "debe" : "aldia");
+  sello.textContent = fmtMoneda.format(saldo);
+
+  document.getElementById("detalleGastoNombre").textContent = g.nombre;
+  document.getElementById("detalleGastoMeta").textContent = g.notas || "";
+
+  const tbody = document.getElementById("tablaHistorialGastoBody");
+  const historialVacio = document.getElementById("historialGastoVacio");
+  const ordenadas = [...g.transacciones].sort((a,b) => a.fecha.localeCompare(b.fecha) || a.id.localeCompare(b.id));
+
+  if(ordenadas.length === 0){
+    tbody.innerHTML = "";
+    historialVacio.hidden = false;
+  } else {
+    historialVacio.hidden = true;
+    let acumulado = 0;
+    const filas = ordenadas.map(t => {
+      acumulado += (t.tipo === "cargo" ? t.monto : -t.monto);
+      const signo = t.tipo === "cargo" ? "+" : "−";
+      const claseMonto = t.tipo === "cargo" ? "monto-deuda" : "monto-abono";
+      return `
+        <tr data-txid="${t.id}">
+          <td>${fmtFecha(t.fecha)}</td>
+          <td>${escapeHTML(t.concepto || (t.tipo === "cargo" ? "Cargo" : "Abono"))}
+            <span class="tx-concepto-tipo">${t.tipo === "cargo" ? "Cargo" : "Abono"}${t.automatico ? '<span class="tx-automatica">automático</span>' : ""}</span>
+          </td>
+          <td class="col-monto ${claseMonto}">${signo} ${fmtMoneda.format(t.monto)}</td>
+          <td class="col-monto">${fmtMoneda.format(acumulado)}</td>
+          <td class="col-acciones-tx">
+            <button class="btn-editar-tx" data-txid="${t.id}" title="Editar movimiento" aria-label="Editar movimiento">✎</button>
+            <button class="btn-borrar-tx" data-txid="${t.id}" title="Eliminar movimiento" aria-label="Eliminar movimiento">✕</button>
+          </td>
+        </tr>
+      `;
+    }).reverse();
+    tbody.innerHTML = filas.join("");
+    tbody.querySelectorAll(".btn-borrar-tx").forEach(btn => {
+      btn.addEventListener("click", (e) => { e.stopPropagation(); eliminarTransaccionGasto(btn.dataset.txid); });
+    });
+    tbody.querySelectorAll(".btn-editar-tx").forEach(btn => {
+      btn.addEventListener("click", (e) => { e.stopPropagation(); editarTxDirecto(btn.dataset.txid, "gasto"); });
+    });
+    tbody.querySelectorAll("tr[data-txid]").forEach(tr => {
+      tr.addEventListener("click", () => abrirTxDetalle(tr.dataset.txid, "gasto"));
+    });
+  }
+}
+
+function eliminarTransaccionGasto(txId){
+  const g = getGastoActivo();
+  if(!g) return;
+  if(!confirm("¿Eliminar este movimiento del historial? Esta acción no se puede deshacer.")) return;
+  g.transacciones = g.transacciones.filter(t => t.id !== txId);
+  guardarEstado();
+  render();
+}
+
+/* ---------- Editar datos de la cuenta de gastos ---------- */
+function abrirEdicionGasto(){
+  const g = getGastoActivo();
+  document.getElementById("editGastoNombre").value = g.nombre;
+  document.getElementById("editGastoNotas").value = g.notas || "";
+  document.getElementById("detalleGastoEditar").hidden = false;
+}
+
+function guardarEdicionGasto(){
+  const g = getGastoActivo();
+  const nombre = document.getElementById("editGastoNombre").value.trim();
+  if(!nombre){ mostrarToast("El nombre no puede quedar vacío."); return; }
+  g.nombre = nombre;
+  g.notas = document.getElementById("editGastoNotas").value.trim();
+  guardarEstado();
+  document.getElementById("detalleGastoEditar").hidden = true;
+  render();
+  mostrarToast("Datos actualizados.");
+}
+
+function eliminarGasto(){
+  const g = getGastoActivo();
+  if(!confirm(`¿Eliminar la cuenta "${g.nombre}" y todo su historial? Esta acción no se puede deshacer.\n\nSi hay propiedades vinculadas a esta cuenta, dejarán de sumarle sus abonos automáticamente.`)) return;
+  estado.cuentasGastos = estado.cuentasGastos.filter(x => x.id !== g.id);
+  estado.propiedades.forEach(p => { if(p.cuentaGastosVinculadaId === g.id) p.cuentaGastosVinculadaId = null; });
+  guardarEstado();
+  cerrarDetalleGasto();
+  render();
+  mostrarToast("Cuenta de gastos eliminada.");
+}
+
+/* ---------- Formulario de transacción (cargo / abono) ---------- */
+function abrirFormTxGasto(tipo){
+  modoTxGasto = tipo;
+  const form = document.getElementById("formTransaccionGasto");
+  document.getElementById("formTransaccionGastoTitulo").textContent = tipo === "cargo" ? "Registrar cargo" : "Registrar abono";
+  document.getElementById("txGastoMonto").value = "";
+  document.getElementById("txGastoConcepto").value = "";
+  document.getElementById("txGastoConcepto").placeholder = tipo === "cargo" ? "Ej: ingreso adicional, ajuste…" : "Ej: pago de mantenimiento, reparación…";
+  document.getElementById("txGastoFecha").value = hoyISO();
+  form.hidden = false;
+  document.getElementById("txGastoMonto").focus();
+}
+
+function cancelarFormTxGasto(){
+  document.getElementById("formTransaccionGasto").hidden = true;
+  modoTxGasto = null;
+}
+
+function guardarTxGasto(ev){
+  ev.preventDefault();
+  const g = getGastoActivo();
+  const monto = parseFloat(document.getElementById("txGastoMonto").value);
+  if(isNaN(monto) || monto <= 0){ mostrarToast("Ingresa un monto válido."); return; }
+  const fecha = document.getElementById("txGastoFecha").value || hoyISO();
+  const concepto = document.getElementById("txGastoConcepto").value.trim();
+
+  g.transacciones.push({
+    id: generarId(),
+    fecha,
+    tipo: modoTxGasto,
+    concepto,
+    monto: Math.round(monto * 100) / 100,
+    automatico: false
+  });
+  guardarEstado();
+  cancelarFormTxGasto();
+  render();
+  mostrarToast(modoTxGasto === "cargo" ? "Cargo registrado." : "Abono registrado.");
+}
+
+/* ---------- Nueva cuenta de gastos ---------- */
+function abrirModalNuevaCuentaGasto(){
+  document.getElementById("formNuevaCuentaGasto").reset();
+  document.getElementById("nuevoGastoMontoInicial").value = "0";
+  document.getElementById("overlayNuevaCuentaGasto").hidden = false;
+  document.getElementById("nuevoGastoNombre").focus();
+}
+function cerrarModalNuevaCuentaGasto(){
+  document.getElementById("overlayNuevaCuentaGasto").hidden = true;
+}
+
+function guardarNuevaCuentaGasto(ev){
+  ev.preventDefault();
+  const nombre = document.getElementById("nuevoGastoNombre").value.trim();
+  if(!nombre){ mostrarToast("El nombre es obligatorio."); return; }
+
+  const montoInicial = parseFloat(document.getElementById("nuevoGastoMontoInicial").value) || 0;
+  const nueva = {
+    id: generarId(),
+    nombre,
+    notas: document.getElementById("nuevoGastoNotas").value.trim(),
+    fechaCreacion: hoyISO(),
+    transacciones: []
+  };
+
+  if(montoInicial > 0){
+    nueva.transacciones.push({
+      id: generarId(),
+      fecha: hoyISO(),
+      tipo: "cargo",
+      concepto: document.getElementById("nuevoGastoConceptoInicial").value.trim() || "Saldo inicial",
+      monto: Math.round(montoInicial * 100) / 100,
+      automatico: false
+    });
+  }
+
+  estado.cuentasGastos.push(nueva);
+  guardarEstado();
+  cerrarModalNuevaCuentaGasto();
+  render();
+  mostrarToast("Cuenta de gastos agregada.");
+}
+
+/* ---------- Estado de cuenta detallado (cuenta de gastos) ---------- */
+function construirEstadoCuentaHTMLGasto(g){
+  const ordenadas = [...g.transacciones].sort((a,b) => a.fecha.localeCompare(b.fecha) || a.id.localeCompare(b.id));
+  let acumulado = 0;
+  const filas = ordenadas.map(t => {
+    acumulado += (t.tipo === "cargo" ? t.monto : -t.monto);
+    const signo = t.tipo === "cargo" ? "+" : "−";
+    return `
+      <tr>
+        <td>${fmtFecha(t.fecha)}</td>
+        <td>${escapeHTML(t.concepto || (t.tipo === "cargo" ? "Cargo" : "Abono"))}</td>
+        <td>${t.tipo === "cargo" ? "Cargo" : "Abono"}${t.automatico ? " (automático)" : ""}</td>
+        <td class="col-monto">${signo} ${fmtMoneda.format(t.monto)}</td>
+        <td class="col-monto">${fmtMoneda.format(acumulado)}</td>
+      </tr>
+    `;
+  }).join("");
+
+  const totalCargos = g.transacciones.filter(t => t.tipo === "cargo").reduce((a,t) => a + t.monto, 0);
+  const totalAbonado = g.transacciones.filter(t => t.tipo === "abono").reduce((a,t) => a + t.monto, 0);
+  const saldoFinal = totalCargos - totalAbonado;
+
+  const filasVacias = ordenadas.length === 0
+    ? `<tr><td colspan="5" style="text-align:center; color:var(--ink-soft); padding:16px 0;">Sin movimientos todavía.</td></tr>`
+    : filas;
+
+  return `
+    <div class="estado-doc">
+      <div class="estado-doc-header">
+        <div>
+          <p class="estado-doc-marca">Cuentas <span>×</span> Cobrar</p>
+          <p class="estado-doc-titulo">Estado de Cuenta — Gastos</p>
+        </div>
+        <div class="estado-doc-emision">
+          Emitido: ${fmtFecha(hoyISO())}
+        </div>
+      </div>
+
+      <dl class="estado-doc-datos">
+        <div><dt>Cuenta</dt><dd>${escapeHTML(g.nombre)}</dd></div>
+        <div><dt>Creada</dt><dd>${fmtFecha(g.fechaCreacion)}</dd></div>
+        <div><dt>Notas</dt><dd>${g.notas ? escapeHTML(g.notas) : "—"}</dd></div>
+      </dl>
+
+      <table class="estado-doc-tabla">
+        <thead>
+          <tr><th>Fecha</th><th>Concepto</th><th>Tipo</th><th class="col-monto">Monto</th><th class="col-monto">Saldo</th></tr>
+        </thead>
+        <tbody>${filasVacias}</tbody>
+      </table>
+
+      <div class="estado-doc-resumen">
+        <div><span>Total cargos</span><span class="valor">${fmtMoneda.format(totalCargos)}</span></div>
+        <div><span>Total abonado</span><span class="valor">${fmtMoneda.format(totalAbonado)}</span></div>
+        <div><span>Saldo actual</span><span class="valor">${fmtMoneda.format(saldoFinal)}</span></div>
+      </div>
+
+      <p class="estado-doc-footer">Documento generado por Cuentas × Cobrar el ${fmtFecha(hoyISO())}.</p>
+    </div>
+  `;
+}
+
+function abrirEstadoCuentaGasto(){
+  const g = getGastoActivo();
+  if(!g) return;
+  estadoCuentaContexto = "gasto";
+  document.getElementById("estadoCuentaContenido").innerHTML = construirEstadoCuentaHTMLGasto(g);
+  document.getElementById("overlayEstado").hidden = false;
+}
+
+/* ---------- Exportar a Excel (cuenta de gastos) ---------- */
+function filasHistorialParaExcelGasto(g){
+  const ordenadas = [...g.transacciones].sort((a,b) => a.fecha.localeCompare(b.fecha) || a.id.localeCompare(b.id));
+  let acumulado = 0;
+  const filas = [["Fecha","Concepto","Tipo","Monto","Saldo acumulado"]];
+  ordenadas.forEach(t => {
+    acumulado += (t.tipo === "cargo" ? t.monto : -t.monto);
+    filas.push([
+      fmtFecha(t.fecha),
+      t.concepto || (t.tipo === "cargo" ? "Cargo" : "Abono"),
+      (t.tipo === "cargo" ? "Cargo" : "Abono") + (t.automatico ? " (automático)" : ""),
+      t.tipo === "cargo" ? t.monto : -t.monto,
+      acumulado
+    ]);
+  });
+  return filas;
+}
+
+function exportarGastoExcel(g){
+  if(typeof XLSX === "undefined"){ mostrarToast("No se pudo cargar el módulo de Excel. Revisa tu conexión a internet."); return; }
+  const totalCargos = g.transacciones.filter(t => t.tipo === "cargo").reduce((a,t) => a + t.monto, 0);
+  const totalAbonado = g.transacciones.filter(t => t.tipo === "abono").reduce((a,t) => a + t.monto, 0);
+
+  const encabezado = [
+    ["Cuentas x Cobrar — Estado de Cuenta de Gastos"],
+    ["Cuenta", g.nombre],
+    ["Notas", g.notas || ""],
+    ["Emitido", fmtFecha(hoyISO())],
+    []
+  ];
+  const filas = filasHistorialParaExcelGasto(g);
+  const cierre = [
+    [],
+    ["Total cargos", totalCargos],
+    ["Total abonado", totalAbonado],
+    ["Saldo actual", totalCargos - totalAbonado]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([...encabezado, ...filas, ...cierre]);
+  ws["!cols"] = [{wch:14},{wch:32},{wch:16},{wch:14},{wch:16}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Estado de cuenta");
+  XLSX.writeFile(wb, `estado-de-cuenta-${g.nombre.replace(/[^\w\- ]/g,"").trim() || "gastos"}.xlsx`);
+  mostrarToast("Excel exportado.");
+}
+
+/* ==========================================================
    Exportar / importar respaldo
    ========================================================== */
 function exportarRespaldo(){
@@ -1253,6 +1705,7 @@ function importarRespaldo(ev){
       const data = JSON.parse(reader.result);
       if(!Array.isArray(data.deudores)) throw new Error("Formato inválido");
       if(!Array.isArray(data.propiedades)) data.propiedades = [];
+      if(!Array.isArray(data.cuentasGastos)) data.cuentasGastos = [];
       if(!confirm("Esto reemplazará todos los datos actuales por los del archivo. ¿Continuar?")) return;
       estado = data;
       guardarEstado();
@@ -1293,6 +1746,9 @@ document.getElementById("btnExportarEstadoExcel").addEventListener("click", () =
   if(estadoCuentaContexto === "propiedad"){
     const p = getPropiedadActiva();
     if(p) exportarPropiedadExcel(p);
+  } else if(estadoCuentaContexto === "gasto"){
+    const g = getGastoActivo();
+    if(g) exportarGastoExcel(g);
   } else {
     const d = getDeudorActivo();
     if(d) exportarDeudorExcel(d);
@@ -1320,6 +1776,7 @@ document.getElementById("inputImportar").addEventListener("change", importarResp
 
 document.getElementById("tabDeudores").addEventListener("click", () => cambiarModo("deudores"));
 document.getElementById("tabPropiedades").addEventListener("click", () => cambiarModo("propiedades"));
+document.getElementById("tabGastos").addEventListener("click", () => cambiarModo("gastos"));
 
 document.getElementById("btnNuevaPropiedad").addEventListener("click", abrirModalNuevaPropiedad);
 document.getElementById("btnNuevaPropiedadVacio").addEventListener("click", abrirModalNuevaPropiedad);
@@ -1344,6 +1801,29 @@ document.getElementById("formTransaccionProp").addEventListener("submit", guarda
 document.getElementById("buscadorProp").addEventListener("input", renderListaPropiedades);
 document.getElementById("ordenSelectProp").addEventListener("change", renderListaPropiedades);
 
+document.getElementById("btnNuevaCuentaGasto").addEventListener("click", abrirModalNuevaCuentaGasto);
+document.getElementById("btnNuevaCuentaGastoVacio").addEventListener("click", abrirModalNuevaCuentaGasto);
+document.getElementById("btnCerrarNuevaCuentaGasto").addEventListener("click", cerrarModalNuevaCuentaGasto);
+document.getElementById("btnCancelarNuevaCuentaGasto").addEventListener("click", cerrarModalNuevaCuentaGasto);
+document.getElementById("overlayNuevaCuentaGasto").addEventListener("click", (e) => { if(e.target.id === "overlayNuevaCuentaGasto") cerrarModalNuevaCuentaGasto(); });
+document.getElementById("formNuevaCuentaGasto").addEventListener("submit", guardarNuevaCuentaGasto);
+
+document.getElementById("btnCerrarDetalleGasto").addEventListener("click", cerrarDetalleGasto);
+document.getElementById("overlayDetalleGasto").addEventListener("click", (e) => { if(e.target.id === "overlayDetalleGasto") cerrarDetalleGasto(); });
+document.getElementById("btnEditarGasto").addEventListener("click", abrirEdicionGasto);
+document.getElementById("btnGuardarEdicionGasto").addEventListener("click", guardarEdicionGasto);
+document.getElementById("btnCancelarEdicionGasto").addEventListener("click", () => { document.getElementById("detalleGastoEditar").hidden = true; });
+document.getElementById("btnVerEstadoCuentaGasto").addEventListener("click", abrirEstadoCuentaGasto);
+document.getElementById("btnEliminarGasto").addEventListener("click", eliminarGasto);
+
+document.getElementById("btnRegistrarCargoGasto").addEventListener("click", () => abrirFormTxGasto("cargo"));
+document.getElementById("btnRegistrarAbonoGasto").addEventListener("click", () => abrirFormTxGasto("abono"));
+document.getElementById("btnCancelarTxGasto").addEventListener("click", cancelarFormTxGasto);
+document.getElementById("formTransaccionGasto").addEventListener("submit", guardarTxGasto);
+
+document.getElementById("buscadorGasto").addEventListener("input", renderListaGastos);
+document.getElementById("ordenSelectGasto").addEventListener("change", renderListaGastos);
+
 document.addEventListener("keydown", (e) => {
   if(e.key === "Escape"){
     if(!document.getElementById("overlayDetalle").hidden) cerrarDetalle();
@@ -1352,6 +1832,8 @@ document.addEventListener("keydown", (e) => {
     if(!document.getElementById("overlayTxDetalle").hidden) cerrarTxDetalle();
     if(!document.getElementById("overlayDetallePropiedad").hidden) cerrarDetallePropiedad();
     if(!document.getElementById("overlayNuevaPropiedad").hidden) cerrarModalNuevaPropiedad();
+    if(!document.getElementById("overlayDetalleGasto").hidden) cerrarDetalleGasto();
+    if(!document.getElementById("overlayNuevaCuentaGasto").hidden) cerrarModalNuevaCuentaGasto();
   }
 });
 
@@ -1460,9 +1942,10 @@ auth.onAuthStateChanged((user) => {
     procesarVencimientosAutomaticos();
   } else {
     if(unsuscribirEstado){ unsuscribirEstado(); unsuscribirEstado = null; }
-    estado = { deudores: [], propiedades: [] };
+    estado = { deudores: [], propiedades: [], cuentasGastos: [] };
     deudorActivoId = null;
     propiedadActivaId = null;
+    gastoActivoId = null;
     document.getElementById("appContent").hidden = true;
     document.getElementById("authGate").hidden = false;
   }
