@@ -280,6 +280,7 @@ fieldset.deuda-inicial{
 fieldset.deuda-inicial legend{font-size:.8rem; font-weight:600; color:var(--ink); padding:0 6px;}
 .opcional{font-weight:400; color:#8B95A0; font-size:.75rem;}
 .ayuda-campo{font-size:.76rem; color:var(--ink-soft); margin:-8px 0 0;}
+.btn-subetiqueta{display:block; font-size:.7rem; font-weight:400; opacity:.8; margin-top:2px;}
 
 #formNuevoDeudor{display:flex; flex-direction:column; gap:14px; margin-top:16px;}
 
