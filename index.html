@@ -78,6 +78,7 @@
   <nav class="modo-tabs">
     <button class="tab-modo activo" id="tabDeudores" data-modo="deudores">Cuentas × Cobrar</button>
     <button class="tab-modo" id="tabPropiedades" data-modo="propiedades">Ingresos por Alquileres</button>
+    <button class="tab-modo" id="tabGastos" data-modo="gastos">Control Gastos</button>
   </nav>
 </header>
 
@@ -141,6 +142,40 @@
       <p class="estado-vacio-sello">∅</p>
       <p>Todavía no has registrado ninguna propiedad.</p>
       <button class="btn btn-primary" id="btnNuevaPropiedadVacio">Agregar la primera</button>
+    </div>
+  </section>
+
+</main>
+
+<main class="app-main" id="vistaGastos" hidden>
+
+  <section class="resumen-alquileres">
+    <div class="resumen-item">
+      <span class="resumen-label">Saldo total</span>
+      <span class="resumen-valor" id="sumGastoSaldoTotal">$0.00</span>
+    </div>
+    <div class="resumen-item">
+      <span class="resumen-label">Cuentas de gastos</span>
+      <span class="resumen-valor" id="sumGastoCantidad">0</span>
+    </div>
+  </section>
+
+  <section class="toolbar">
+    <input type="search" id="buscadorGasto" placeholder="Buscar cuenta de gastos por nombre…" autocomplete="off">
+    <select id="ordenSelectGasto">
+      <option value="saldo-desc">Mayor saldo primero</option>
+      <option value="nombre-asc">Nombre (A–Z)</option>
+      <option value="reciente">Más reciente</option>
+    </select>
+    <button class="btn btn-primary" id="btnNuevaCuentaGasto">+ Nueva cuenta de gastos</button>
+  </section>
+
+  <section class="lista-wrap">
+    <div id="listaGastos" class="lista-deudores"></div>
+    <div id="estadoVacioGasto" class="estado-vacio" hidden>
+      <p class="estado-vacio-sello">∅</p>
+      <p>Todavía no has registrado ninguna cuenta de gastos.</p>
+      <button class="btn btn-primary" id="btnNuevaCuentaGastoVacio">Agregar la primera</button>
     </div>
   </section>
 
@@ -345,7 +380,7 @@
       <div class="detalle-sello" id="detallePropSello">$0.00</div>
       <h2 id="detallePropNombre">—</h2>
       <p class="detalle-meta" id="detallePropMeta"></p>
-      <p class="detalle-meta detalle-canon-info" id="detallePropCanonInfo"></p>
+      <div class="vencimiento-badge" id="detallePropCanonInfo"></div>
 
       <div class="detalle-editar" id="detallePropEditar" hidden>
         <input type="text" id="editPropNombre" placeholder="Nombre / dirección de la propiedad">
@@ -358,6 +393,12 @@
         <label class="label-inline">
           Próximo vencimiento
           <input type="date" id="editPropVencimiento">
+        </label>
+        <label class="label-inline">
+          Cuenta de gastos vinculada
+          <select id="editPropCuentaGastos">
+            <option value="">Ninguna (no vincular)</option>
+          </select>
         </label>
         <textarea id="editPropNotas" placeholder="Notas (opcional)" rows="2"></textarea>
         <div class="fila-botones">
@@ -454,12 +495,121 @@
         </label>
       </fieldset>
       <label>
+        Cuenta de gastos vinculada <span class="opcional">(opcional)</span>
+        <select id="nuevoPropCuentaGastos">
+          <option value="">Ninguna (no vincular)</option>
+        </select>
+      </label>
+      <p class="ayuda-campo">Cada abono que registres en esta propiedad se sumará automáticamente a la cuenta de gastos elegida.</p>
+      <label>
         Notas <span class="opcional">(opcional)</span>
         <textarea id="nuevoPropNotas" rows="2" placeholder="Cualquier detalle adicional"></textarea>
       </label>
       <div class="fila-botones">
         <button type="submit" class="btn btn-primary">Guardar propiedad</button>
         <button type="button" class="btn btn-ghost" id="btnCancelarNuevaPropiedad">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Panel de detalle de cuenta de gastos -->
+<div class="overlay" id="overlayDetalleGasto" hidden>
+  <aside class="panel-detalle" id="panelDetalleGasto" role="dialog" aria-modal="true" aria-labelledby="detalleGastoNombre">
+    <button class="btn-cerrar" id="btnCerrarDetalleGasto" aria-label="Cerrar">✕</button>
+
+    <div class="detalle-header">
+      <div class="detalle-sello" id="detalleGastoSello">$0.00</div>
+      <h2 id="detalleGastoNombre">—</h2>
+      <p class="detalle-meta" id="detalleGastoMeta"></p>
+
+      <div class="detalle-editar" id="detalleGastoEditar" hidden>
+        <input type="text" id="editGastoNombre" placeholder="Nombre de la cuenta de gastos">
+        <textarea id="editGastoNotas" placeholder="Notas (opcional)" rows="2"></textarea>
+        <div class="fila-botones">
+          <button class="btn btn-primary" id="btnGuardarEdicionGasto">Guardar</button>
+          <button class="btn btn-ghost" id="btnCancelarEdicionGasto">Cancelar</button>
+        </div>
+      </div>
+      <div class="detalle-acciones">
+        <button class="btn btn-link" id="btnEditarGasto">Editar datos</button>
+        <button class="btn btn-link" id="btnVerEstadoCuentaGasto">Ver estado de cuenta detallado</button>
+        <button class="btn btn-link btn-peligro" id="btnEliminarGasto">Eliminar cuenta</button>
+      </div>
+    </div>
+
+    <div class="detalle-nuevas-acciones">
+      <button class="btn btn-deuda" id="btnRegistrarCargoGasto">+ Registrar cargo</button>
+      <button class="btn btn-abono" id="btnRegistrarAbonoGasto">+ Registrar abono</button>
+    </div>
+
+    <form class="form-transaccion" id="formTransaccionGasto" hidden>
+      <h3 id="formTransaccionGastoTitulo">Registrar cargo</h3>
+      <label>
+        Monto
+        <input type="number" id="txGastoMonto" min="0.01" step="0.01" placeholder="0.00" required>
+      </label>
+      <label>
+        Concepto / descripción
+        <input type="text" id="txGastoConcepto" placeholder="Ej: pago de mantenimiento, reparación…">
+      </label>
+      <label>
+        Fecha
+        <input type="date" id="txGastoFecha" required>
+      </label>
+      <div class="fila-botones">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <button type="button" class="btn btn-ghost" id="btnCancelarTxGasto">Cancelar</button>
+      </div>
+    </form>
+
+    <div class="detalle-historial">
+      <h3>Historial</h3>
+      <table class="tabla-historial">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Concepto</th>
+            <th class="col-monto">Monto</th>
+            <th class="col-monto">Saldo</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tablaHistorialGastoBody"></tbody>
+      </table>
+      <p class="historial-vacio" id="historialGastoVacio" hidden>Sin movimientos todavía.</p>
+    </div>
+  </aside>
+</div>
+
+<!-- Modal nueva cuenta de gastos -->
+<div class="overlay" id="overlayNuevaCuentaGasto" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloModalNuevaCuentaGasto">
+    <button class="btn-cerrar" id="btnCerrarNuevaCuentaGasto" aria-label="Cerrar">✕</button>
+    <h2 id="tituloModalNuevaCuentaGasto">Nueva cuenta de gastos</h2>
+    <form id="formNuevaCuentaGasto">
+      <label>
+        Nombre
+        <input type="text" id="nuevoGastoNombre" required placeholder="Ej: Gastos Chichi y otros">
+      </label>
+      <fieldset class="deuda-inicial">
+        <legend>Saldo inicial <span class="opcional">(puede quedar en $0.00)</span></legend>
+        <label>
+          Monto
+          <input type="number" id="nuevoGastoMontoInicial" min="0" step="0.01" value="0" placeholder="0.00">
+        </label>
+        <label>
+          Concepto / descripción
+          <input type="text" id="nuevoGastoConceptoInicial" placeholder="Ej: saldo inicial de la cuenta">
+        </label>
+      </fieldset>
+      <label>
+        Notas <span class="opcional">(opcional)</span>
+        <textarea id="nuevoGastoNotas" rows="2" placeholder="Cualquier detalle adicional"></textarea>
+      </label>
+      <div class="fila-botones">
+        <button type="submit" class="btn btn-primary">Guardar cuenta</button>
+        <button type="button" class="btn btn-ghost" id="btnCancelarNuevaCuentaGasto">Cancelar</button>
       </div>
     </form>
   </div>
